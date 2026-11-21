@@ -21,7 +21,7 @@ This project was built as part of the Web Programming Lab 12 practical assignmen
 | **Vanilla JavaScript** | Product rendering, cart logic, form validation, XML parsing via `fetch()` and `DOMParser` |
 | **XML** | Product catalogue stored in `data/products.xml`; parsed at runtime — no hardcoded product arrays anywhere |
 
-No frameworks, no npm packages, no build step — just standards-compliant front-end code.
+
 
 ---
 
