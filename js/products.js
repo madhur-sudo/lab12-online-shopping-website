@@ -73,6 +73,7 @@ function renderProductCard(product) {
           <button
             class="btn btn--primary product-card__add"
             data-id="${escapeHTML(product.id)}"
+            data-stock="${product.stock}"
             aria-label="Add ${escapeHTML(product.name)} to cart"
             ${product.stock === 0 ? 'disabled' : ''}
           >${product.stock === 0 ? 'Out of stock' : 'Add to cart'}</button>
@@ -146,7 +147,9 @@ function initAddToCartButtons(container) {
     const btn = e.target.closest('.product-card__add[data-id]');
     if (!btn) return;
     const id = btn.dataset.id;
-    addToCart(id, 1);
+    const added = addToCart(id, 1, Number(btn.dataset.stock));
+    if (!added) return;
+    showToast('Item added to your cart.');
 
     // Brief visual feedback
     btn.textContent = 'Added!';

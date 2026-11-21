@@ -51,7 +51,7 @@
 
     ids.forEach(function (id) {
       var product = findProductById(xmlDoc, id);
-      if (!product) return; // product removed from XML — skip silently
+      if (!product || product.stock <= 0) return;
 
       var qty = parseInt(cartObj[id], 10) || 1;
       // Clamp qty to available stock
@@ -65,7 +65,7 @@
     });
 
     // If cart had stale IDs, clean them up
-    saveCart(validCart);
+      saveCart(validCart);
     updateCartCount();
 
     if (!rowsHTML) {
@@ -248,9 +248,11 @@
       cartItems.innerHTML =
         '<div class="empty-state error-state">' +
           '<p>We couldn\'t load product information right now. Please refresh the page.</p>' +
-          '<button class="btn btn-outline" onclick="location.reload()">Refresh</button>' +
+          '<button class="btn btn-outline" id="cart-refresh-btn">Refresh</button>' +
         '</div>';
     }
+    var refresh = document.getElementById('cart-refresh-btn');
+    if (refresh) refresh.addEventListener('click', function () { location.reload(); });
     if (sidebar) sidebar.hidden = true;
   }
 

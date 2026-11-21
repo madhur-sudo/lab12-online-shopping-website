@@ -59,6 +59,7 @@
       img.alt = product.name;
       img.onerror = function () {
         this.src = './assets/images/placeholder.svg';
+        this.onerror = null;
       };
     }
 
@@ -139,7 +140,8 @@
       if (!qtyInput) return;
       const min = parseInt(qtyInput.min, 10) || 1;
       const max = parseInt(qtyInput.max, 10) || product.stock;
-      const clamped = Math.max(min, Math.min(max, val));
+      const numeric = Number(val);
+      const clamped = Math.max(min, Math.min(max, Number.isFinite(numeric) ? Math.trunc(numeric) : min));
       qtyInput.value = clamped;
       // Update button states
       if (decreaseBtn) decreaseBtn.disabled = clamped <= min;
@@ -163,7 +165,7 @@
       addBtn.addEventListener('click', () => {
         const qty = getQty();
         if (typeof addToCart === 'function') {
-          addToCart(product.id, qty);
+          if (!addToCart(product.id, qty, product.stock)) return;
         }
         if (typeof updateCartCount === 'function') {
           updateCartCount();

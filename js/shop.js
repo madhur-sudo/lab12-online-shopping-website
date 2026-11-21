@@ -50,6 +50,9 @@
         searchInput.value = q;
       }
     }
+    const sort = params.get('sort');
+    const sortSelect = document.getElementById('sort-select');
+    if (sortSelect && Array.from(sortSelect.options).some(option => option.value === sort)) sortSelect.value = sort;
   }
 
   // ─── Category Filter Population ───────────────────────────────────────────
@@ -87,6 +90,8 @@
     if (clearBtn) {
       clearBtn.addEventListener('click', clearFilters);
     }
+    [searchInput, categoryFilter, sortSelect].forEach(el => el && el.addEventListener('change', syncURL));
+    if (searchInput) searchInput.addEventListener('input', syncURL);
 
     // Event delegation for Add to Cart buttons
     const grid = document.getElementById('products-grid');
@@ -115,7 +120,8 @@
       filtered = filtered.filter(p =>
         p.name.toLowerCase().includes(query) ||
         (p.shortDescription || '').toLowerCase().includes(query) ||
-        (p.description || '').toLowerCase().includes(query)
+        (p.description || '').toLowerCase().includes(query) ||
+        p.category.toLowerCase().includes(query)
       );
     }
 
@@ -155,6 +161,17 @@
     const filtered = getFilteredProducts();
     updateCount(filtered.length);
     renderGrid(filtered);
+  }
+
+  function syncURL() {
+    const params = new URLSearchParams();
+    const q = document.getElementById('search-input')?.value.trim();
+    const category = document.getElementById('category-filter')?.value;
+    const sort = document.getElementById('sort-select')?.value;
+    if (q) params.set('q', q);
+    if (category) params.set('category', category);
+    if (sort && sort !== 'featured') params.set('sort', sort);
+    history.replaceState(null, '', './shop.html' + (params.size ? '?' + params.toString() : ''));
   }
 
   function updateCount(n) {
@@ -207,7 +224,7 @@
         <a href="./product.html?id=${encodeURIComponent(product.id)}" class="product-card-image-link" tabindex="-1" aria-hidden="true">
           <div class="product-card-image-wrap">
             <img
-              src="${escapeHtml(product.image)}"
+              src="./${escapeHtml(product.image)}"
               alt="${escapeHtml(product.name)}"
               class="product-card-img"
               loading="lazy"
@@ -229,9 +246,11 @@
             <button
               class="btn btn-primary btn-add-to-cart btn-sm"
               data-product-id="${escapeHtml(product.id)}"
+              data-stock="${product.stock}"
               aria-label="Add ${escapeHtml(product.name)} to cart"
+              ${product.stock === 0 ? 'disabled' : ''}
             >
-              Add to Cart
+              ${product.stock === 0 ? 'Out of stock' : 'Add to Cart'}
             </button>
           </div>
         </div>
@@ -245,9 +264,7 @@
     const product = allProducts.find(p => p.id === productId);
     if (!product) return;
 
-    if (typeof addToCart === 'function') {
-      addToCart(productId, 1);
-    }
+    if (!addToCart(productId, 1, product.stock)) return;
     if (typeof updateCartCount === 'function') {
       updateCartCount();
     }
@@ -268,6 +285,7 @@
     if (sortSelect) sortSelect.selectedIndex = 0;
 
     updateDisplay();
+    syncURL();
   }
 
   // ─── Utility ──────────────────────────────────────────────────────────────

@@ -13,6 +13,7 @@ const SHIPPING_THRESHOLD = 2500;
 const SHIPPING_CHARGE    = 99;
 const XML_PATH           = './data/products.xml'; // relative — works on GitHub Pages
 const CART_KEY           = 'morrowCart';
+const LEGACY_CART_KEY     = 'morrow_cart';
 
 /* ─────────────────────────────────────────────
    INR CURRENCY FORMATTER
@@ -42,9 +43,33 @@ function formatINR(amount) {
  */
 function getCart() {
   try {
-    const raw = localStorage.getItem(CART_KEY);
-    return raw ? JSON.parse(raw) : {};
+    const currentRaw = localStorage.getItem(CART_KEY);
+    if (currentRaw !== null) return parseStoredCart(currentRaw);
+    const legacyRaw = localStorage.getItem(LEGACY_CART_KEY);
+    const legacy = parseStoredCart(legacyRaw);
+    if (legacyRaw !== null) {
+      try { localStorage.setItem(CART_KEY, JSON.stringify(legacy)); }
+      catch { showToast('Your saved cart was read, but the storage migration could not be completed.'); }
+    }
+    return legacy;
   } catch {
+    showToast('Saved cart data could not be read. Your stored data was left untouched.');
+    return {};
+  }
+}
+
+function parseStoredCart(raw) {
+  if (raw === null) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Invalid cart shape');
+    return Object.keys(parsed).reduce((cart, id) => {
+      const qty = Number(parsed[id]);
+      if (/^[\w-]+$/.test(id) && Number.isSafeInteger(qty) && qty > 0) cart[id] = qty;
+      return cart;
+    }, {});
+  } catch {
+    showToast('Some saved cart data could not be read and was left untouched.');
     return {};
   }
 }
@@ -54,7 +79,14 @@ function getCart() {
  * @param {Object.<string, number>} cart
  */
 function saveCart(cart) {
-  localStorage.setItem(CART_KEY, JSON.stringify(cart));
+  try {
+    localStorage.setItem(CART_KEY, JSON.stringify(cart));
+    updateCartCount();
+    return true;
+  } catch (error) {
+    showToast('Your cart could not be saved. Check browser storage settings and try again.');
+    return false;
+  }
 }
 
 /**
@@ -62,12 +94,17 @@ function saveCart(cart) {
  * @param {string} productId
  * @param {number} qty
  */
-function addToCart(productId, qty = 1) {
+function addToCart(productId, qty = 1, stock = Infinity) {
+  qty = Number(qty);
+  stock = Number(stock);
+  if (!/^[\w-]+$/.test(String(productId)) || !Number.isSafeInteger(qty) || qty < 1 || !(stock > 0)) return false;
   const cart = getCart();
+  if ((cart[productId] || 0) + qty > stock) {
+    showToast('Only ' + stock + ' available. Reduce the quantity in your cart first.');
+    return false;
+  }
   cart[productId] = (cart[productId] || 0) + qty;
-  saveCart(cart);
-  updateCartCount();
-  showToast('Item added to your cart.');
+  return saveCart(cart);
 }
 
 /**
@@ -140,6 +177,7 @@ async function loadXML(path = XML_PATH) {
   if (parseError) {
     throw new Error('XML parse error: ' + parseError.textContent.trim().slice(0, 120));
   }
+  if (xmlDoc.documentElement.nodeName !== 'products') throw new Error('Product catalogue has an invalid root element.');
   return xmlDoc;
 }
 
@@ -180,7 +218,13 @@ function xmlProductToObject(el) {
  * @returns {Array<Object>}
  */
 function parseProducts(xmlDoc) {
-  return Array.from(xmlDoc.querySelectorAll('product')).map(xmlProductToObject);
+  const seen = new Set();
+  return Array.from(xmlDoc.querySelectorAll('products > product')).map(xmlProductToObject).filter(p => {
+    if (!p.id || seen.has(p.id) || !p.name || !p.category || !Number.isFinite(p.price) || p.price < 0 ||
+        !Number.isSafeInteger(p.stock) || p.stock < 0 || !/^assets\/images\/[\w.-]+\.svg$/i.test(p.image)) return false;
+    seen.add(p.id);
+    return true;
+  });
 }
 
 /**
@@ -190,9 +234,7 @@ function parseProducts(xmlDoc) {
  * @returns {Object|null}
  */
 function findProductById(xmlDoc, id) {
-  const els = Array.from(xmlDoc.querySelectorAll('product'));
-  const el  = els.find(e => getXMLText(e, 'id') === id);
-  return el ? xmlProductToObject(el) : null;
+  return parseProducts(xmlDoc).find(product => product.id === id) || null;
 }
 
 /* ─────────────────────────────────────────────
@@ -306,4 +348,8 @@ document.addEventListener('DOMContentLoaded', () => {
   updateCartCount();
   setActiveNav();
   initMobileMenu();
+});
+
+window.addEventListener('storage', event => {
+  if (event.key === CART_KEY || event.key === LEGACY_CART_KEY) updateCartCount();
 });

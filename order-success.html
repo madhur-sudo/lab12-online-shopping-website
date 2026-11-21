@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Order Placed — Morrow Supply</title>
   <meta name="description" content="Your Morrow Supply demo order has been placed." />
-  <link rel="stylesheet" href="./css/style.css" />
+  <link rel="icon" type="image/svg+xml" href="./assets/images/favicon.svg" />
+  <link rel="stylesheet" href="./css/style.css?v=2" />
 </head>
 <body class="page-order-success">
 
@@ -110,7 +111,13 @@
       var wrapper = document.getElementById('order-success-content');
 
       // Read order from sessionStorage
-      var raw = sessionStorage.getItem('morrow_order');
+      var raw;
+      try {
+        raw = sessionStorage.getItem('morrow_order');
+      } catch (e) {
+        window.location.replace('./index.html');
+        return;
+      }
       if (!raw) {
         // No order found — redirect to home
         window.location.replace('./index.html');
@@ -121,6 +128,22 @@
       try {
         order = JSON.parse(raw);
       } catch (e) {
+        window.location.replace('./index.html');
+        return;
+      }
+
+      var validOrder = order && typeof order === 'object' &&
+        typeof order.orderSuffix === 'string' && order.orderSuffix.length >= 6 &&
+        typeof order.customerName === 'string' && order.customerName.trim().length >= 2 &&
+        typeof order.dateFormatted === 'string' && Array.isArray(order.items) && order.items.length > 0 &&
+        order.items.every(function (item) {
+          return item && typeof item.name === 'string' && item.name.trim() &&
+            Number.isSafeInteger(item.qty) && item.qty > 0 && typeof item.lineTotal === 'string';
+        }) && Number.isFinite(order.subtotal) && order.subtotal >= 0 &&
+        (order.shipping === 0 || order.shipping === 99) && order.total === order.subtotal + order.shipping &&
+        typeof order.subtotalFormatted === 'string' && typeof order.shippingFormatted === 'string' &&
+        typeof order.totalFormatted === 'string';
+      if (!validOrder) {
         window.location.replace('./index.html');
         return;
       }
@@ -178,7 +201,7 @@
               '<dd>' + shipping + '</dd>' +
             '</div>' +
             '<div class="summary-row summary-row--total">' +
-              '<dt>Total Paid</dt>' +
+              '<dt>Order Total</dt>' +
               '<dd>' + escapeText(order.totalFormatted) + '</dd>' +
             '</div>' +
           '</dl>' +
